@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<title>广西地图</title>
+<script type="text/JavaScript" src="js/config.js"></script>
+<script type="text/JavaScript" src="js/points.js"></script>
+<script type="text/JavaScript" src="js/echarts.min.js"></script>
+<script type="text/JavaScript" src="js/guangxi.js"></script>
+<script type="text/JavaScript" src="js/jquery-3.3.1.min.js"></script>
+<!--<script src="./static/Avatar-CaseRender/Avatar-CaseRender-0.2.46.js">-->
+</head>
+
+<body>
+	<div id="main" style="height: 800px; width: 800px;border: 1px solid red;"></div>
+	<script type="text/javascript">
+	
+	    //存储日发电量，月发电量，年发电量
+		var queryStationData = new Array();
+		//存储投产容量
+		var queryCap=new Array();
+		
+		//获取日发电量，月发电量，年发电量数据
+		function getQueryData() {
+			$.ajax({
+				type : "GET",
+				url : baseUrl+"Company/queryAllCompanyData",
+				dataType : 'json',
+				async : false,
+				success : function(result) {
+					var newData = JSON.stringify(result); //将json对象转换为字符串
+					newData = eval("(" + newData + ")").data;
+					for (var i = 0; i < newData.length; i++) {
+						queryStationData.push(newData[i]);
+					}
+				}
+			});
+		}
+		
+		//获取投产容量
+		function getCap(){
+		  $.ajax({
+				type : "GET",
+				url : baseUrl+"WdCapInd/all",
+				dataType : 'json',
+				async : false,
+				success : function(result) {
+					var newData = JSON.stringify(result); //将json对象转换为字符串
+					newData = eval("(" + newData + ")").data;
+					for (var i = 0; i < newData.length; i++) {
+						queryCap.push(newData[i]);
+					}
+				}
+			});
+		
+		}
+
+		function addDataToPoint(res) {
+			getQueryData();
+			getCap();
+			//将日发电量，月发电量，年发电量写入结果数组
+			for (var i = 0; i < res.length; i++) {
+				for (var j = 0; j < queryStationData.length; j++) {
+					if (res[i].name === queryStationData[j].city) {
+						res[i].value.push(queryStationData[j].stationName);
+						res[i].value.push(queryStationData[j].dayGnCpt);
+						res[i].value.push(queryStationData[j].monthGnCpt);
+						res[i].value.push(queryStationData[j].yearGnCpt);
+						break;
+					}
+				}
+			}
+			//将投产容量写入结果数组
+			for (var i = 0; i < res.length; i++) {
+				for (var j = 0; j < queryCap.length; j++) {
+				   if(res[i].value[5]===queryCap[j].coName){
+				      res[i].value.push(queryCap[j].proCap);
+					  break;
+				   }
+				}
+		    }
+			
+			return res;
+		}
+
+		/*var convertData = function(data) {
+			var res = [];
+			var tmep = data.features;
+			for (var i = 0; i < tmep.length; i++) {
+				var geoCoord = geoCoordMap[data.features[i].properties.name];
+				if (geoCoord) {
+					res.push({
+						name : data.features[i].properties.name,
+						value : geoCoord
+								.concat(data.features[i].properties.value)
+					});
+				}
+			}
+
+			return addDataToPoint(res);
+		};*/
+
+       var convertData = function (data) {
+    var res = [];
+    for (var i = 0; i < data.length; i++) {
+        var geoCoord = geoCoordMap[data[i]];
+        if (geoCoord) {
+            res.push({
+                name: data[i],
+                value: geoCoord.concat(data[i].value)
+            });
+        }
+    }
+	addDataToPoint(res);
+    return res;
+};
+
+		echarts.registerMap('guangxi', guangxiJson);
+		var chart = echarts.init(document.getElementById('main'));
+		var option = {
+			backgroundColor : '#fff',
+			geo : {
+				aspectScale:0.9,
+				// layoutSize: 100,
+				map : 'guangxi',
+				itemStyle : {
+					areaColor : 'rgb(255,252,209)',
+					borderColor : 'rgb(93,183,232)',
+					borderWidth:1,
+					shadowColor: 'rgb(93,183,232)',
+					shadowOffsetX:-1,
+					shadowOffsetX:1
+				},
+				emphasis : {
+					itemStyle : {
+						areaColor : 'rgb(255,252,209)'
+					},
+					label : {
+						show : true,
+						color : '#000'
+					}
+				},
+				label : {
+					show : true,
+					color : '#000'
+				}
+			},
+			series : [ {
+				name : 'pm2.5', // series名称
+				type : 'scatter', // series图表类型
+				coordinateSystem : 'geo', // series坐标系类型
+				data : convertData(staticArr), // series数据内容
+				//控制显示文本
+				label : {
+					normal : {
+						show : false
+					},
+					emphasis : {
+						show : false,
+						size : 20,
+					}
+				},
+				//series样式
+				itemStyle : {
+					normal : {
+						color : '#ddb926'
+					}
+				},
+				symbol : 'image://data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB0AAAAkCAYAAAB15jFqAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMTQ1IDc5LjE2MzQ5OSwgMjAxOC8wOC8xMy0xNjo0MDoyMiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENDIDIwMTkgKFdpbmRvd3MpIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkJDODE2MEY5NzUyQjExRTlCRjcxRjE0MkY1RjRCQ0JGIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkJDODE2MEZBNzUyQjExRTlCRjcxRjE0MkY1RjRCQ0JGIj4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6QkM4MTYwRjc3NTJCMTFFOUJGNzFGMTQyRjVGNEJDQkYiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6QkM4MTYwRjg3NTJCMTFFOUJGNzFGMTQyRjVGNEJDQkYiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz6V79JsAAADVElEQVR42rxWS09TQRSeWx59IH1AFVpRadX4xBhJjCY+FurChQvj2t/hxqUmrjTRpQuNCxfGrcaFiSvDThNUYlRQRGvEUiiUYgXu9TvNNzo2XG57wZ7ky517585853wz58wox3FUQ1DqAZADjjQ8llA+SB3iRjNJbzPSqF/SVtW43QG2Aj3ArI/xKuBjTBQoAk+UZV1rFmkLMANMAZdA/BS4ACTqncCPvGJtJBU7RcyB+D2ek8AC5+6sflfqIRbz3lpJdcSmCcEhl3/PwaGLeJ4HeSmgmmenqcbh1iYRloFnwC/gaDNIrwC3IOvkeqypl0lanQXZ0Hrt3nrkHATh6HrlaX2bxoXwf5FeXknSf+S1GpwRhd5mc+sK3Tctx7nqMb7uNZVCEAaCrwYGeraNj7f/DIUedRUKVsC2HRANA3eBx2stg1LquoEECauifEulUsl8PpnO5a7j9b7xv5S+NMtjpVFS+ZYCNmoiI9p4Lp1OZMfGpOT1M9nLPOLChIwtAF/Z70kqx1bG+C7RbuH6ScTWx0xmx96RkXhNnV0C8sC4iAF0ATHgMx1wJU2QUEeXBfbIOhr/RBbC4WglGAwxIomkxL5eQqIe5mmToePfVyKNUC6LMg4CfewLs09IglPd3Ym5zk6J4qAxzzyQY6Si1jHgNfAO2Mz1nq3N036jbRKKpyfYH1xlb3QAO4GTwCZ+20+1rJr5q40Yo1H0qs+Qd3eDBaSNa62JDwAbjEz4Qxo1Bm3nM0jP/ZhEto/PANVSJo98bDd+7mI77hZhpFy2YsWiV1EJcZ/oDaoMnurEtkGqbdlttnwyuYy0qdQRce0c9l8pHKeXayl2hncdceA4N4gfkxR5wfYntiWFJhxGOs06rH/QdfmlW0XxsBLTRdsEn9OmvBVWE7ExnviKV8fnrDD1mE2nhwxnpSL94D25ZMqryXdx8TuY3Ka0EVabuJECMnCRzk3TOVOZSTogtfktS2V1kCbV1SnLNW1nvqV9yCsRy63hDaMbNZ2pJdU7OMWoLCZ5lu9eRWKRJ8sHljyR9Yu5a91IlVEcUsxbi5EnmXMhvtskmudJUqCERUpddrs5uJGaZ2iMkkdI1mLk9BKJy5RyRq/datcVL9LVnFn2M1DYfgswAFRe1WSkncB6AAAAAElFTkSuQmCC',
+				symbolSize : 20
+			} ],
+			toolbox : {
+				show : false,
+				orient : 'vertical',
+				left : 'right',
+				top : 'center',
+				feature : {
+					dataView : {
+						readOnly : false
+					},
+					restore : {},
+					saveAsImage : {}
+				}
+			},
+			tooltip : {
+				trigger : 'item',
+				// formatter : function(param) {
+				// 	var name = param.data.name;
+				// 	return param.data.value[5] + '<br/><br/>' + '投产容量：'
+				// 			+ param.data.value[9] + 'MW<br/>' + '日发电量：'
+				// 			+ param.data.value[6] + '万kWh<br/>' + '月发电量：'
+				// 			+ param.data.value[7] + '万kWh<br/>' + '年发电量：'
+				// 			+ param.data.value[8] + '万kWh<br/>';
+				// }
+				formatter : function(param){
+					return '<div id="all" style="width: 300px;height:110px;font-size:8px;padding-left：20px">'+
+					             '<div id="content" style="width:50%;height:100%;background-color: burlywood;display: inline-block;">'+
+                               param.data.value[5]+'<br/>'+
+						                   '投产容量：'+param.data.value[9]+'Mw<br/>'+
+						                   '日发电量: '+param.data.value[6]+'万Kwh<br/>'+
+						                   '月发电量：'+param.data.value[7]+'万Kwh<br/>'+
+					       	             '年发电量：'+param.data.value[8]+'万Kwh'+
+						           '</div>'+
+						           '<div id="pictrue" style="width:50%;height:100%;float:left;" >'+
+                               "<img src='./images/guangxi.jpg' width='100%' height='100%'>"+
+                       '</div>'+
+                 '</div>';
+				}
+			}
+		};
+		chart.setOption(option);
+	</script>
+</body>
+
+</html>
+
